@@ -1,0 +1,76 @@
+version: '3'
+
+tasks:
+
+  init:
+    desc: initialize the project, install packages, create databases, run migrations and load fixtures
+    cmds:
+      - sudo chmod 777 database/database.sqlite
+      - sudo chmod 777 -R storage
+      - sudo chmod 777 -R node_modules
+      - sudo chmod 777 -R public
+      - task: build
+      - task: up
+      - task: composer-install
+      - task: yarn-install
+      - yarn dev
+      - task: create-databases-fixtures
+
+  create-databases-fixtures:
+    desc: create databases, run migrations and load fixtures
+    cmds:
+      - docker compose exec php sh -c "cd /var/www/html && php artisan migrate:refresh --seed"
+
+  build:
+    desc: build docker images
+    cmds:
+      - docker compose build
+
+  up:
+    desc: start the project
+    deps:
+      - task: build
+    cmds:
+      - docker compose up --detach --wait --remove-orphans
+
+  stop:
+    desc: stop the project
+    cmds:
+      - docker compose -f compose.yml stop
+
+  bash-php:
+    desc: connect to the php container console
+    aliases:
+      - php
+    cmds:
+      - docker compose exec php bash
+
+  bash-node:
+    desc: connect to the node container console
+    aliases:
+      - node
+    cmds:
+      - docker compose exec node sh -c "cd /var/www/html && bash"
+  composer-install:
+    desc: install php packages
+    cmds:
+      - docker compose exec php sh -c "cd /var/www/html && php artisan migrate:refresh --seed"
+
+  yarn-install:
+    desc: install node packages
+    cmds:
+      - docker compose exec node yarn install
+
+  down:
+    desc: shutdown the project and remove all docker artifacts
+    prompt: This will fully cleanup docker artifacts for project. Databases will be dropped. Do you want to continue?
+    cmds:
+      - task: stop
+      - docker compose down --volumes --rmi local --remove-orphans
+
+  test:
+    desc: run all tests, including psalm, code sniffer and phpunit
+    cmds:
+      - task: test-psalm
+      - task: test-cs
+      - task: test-phpunit
